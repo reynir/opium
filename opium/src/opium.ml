@@ -28,3 +28,7 @@ module Middleware = struct
   let method_required = Middleware_method_required.m
   let head = Middleware_head.m
 end
+
+module Private = struct
+  module Router = Router
+end

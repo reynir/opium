@@ -2,3 +2,10 @@
  (names middleware_allow_cors request response route)
  (libraries alcotest alcotest-lwt lwt opium opium_testing)
  (package opium))
+
+(library
+ (opium_router_tests)
+ (libraries opium)
+ (preprocess (pps ppx_expect))
+ (inline_tests)
+ (modules opium_router_tests))
