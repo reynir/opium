@@ -91,7 +91,7 @@ module Params = struct
   let create route captured =
     let rec loop acc (route : Route.t) captured =
       match route, captured with
-      | Full_splat, _ -> assert false
+      | Full_splat, [] -> acc
       | Nil, [] -> acc
       | Literal (_, route), _ -> loop acc route captured
       | Param (None, route), p :: captured ->
@@ -100,6 +100,7 @@ module Params = struct
       | Param (Some name, route), p :: captured ->
         let acc = { acc with named = (name, p) :: acc.named } in
         loop acc route captured
+      | Full_splat, _ :: _ -> assert false
       | Param (_, _), [] -> assert false
       | Nil, _ :: _ -> assert false
     in
@@ -111,50 +112,61 @@ end
 module Smap = Map.Make (String)
 
 type 'a t =
-  { data : ('a * Route.t) option
-  ; literal : 'a t Smap.t
-  ; param : 'a t option
-  }
+  | Accept of ('a * Route.t)
+  | Node of
+      { data : ('a * Route.t) option
+      ; literal : 'a t Smap.t
+      ; param : 'a t option
+      }
 
 let sexp_of_smap f smap : Sexp.t =
   List (Smap.bindings smap |> List.map ~f:(fun (k, v) -> Sexp.List [ Atom k; f v ]))
 ;;
 
-let rec sexp_of_t f { data; literal; param } =
+let rec sexp_of_t f t =
   let open Sexp_conv in
-  Sexp.List
-    [ List [ Atom "data"; sexp_of_option (sexp_of_pair f Route.sexp_of_t) data ]
-    ; List [ Atom "literal"; sexp_of_smap (sexp_of_t f) literal ]
-    ; List [ Atom "param"; sexp_of_option (sexp_of_t f) param ]
-    ]
+  match t with
+  | Accept (a, r) -> (sexp_of_pair f Route.sexp_of_t) (a, r)
+  | Node { data; literal; param } ->
+    Sexp.List
+      [ List [ Atom "data"; sexp_of_option (sexp_of_pair f Route.sexp_of_t) data ]
+      ; List [ Atom "literal"; sexp_of_smap (sexp_of_t f) literal ]
+      ; List [ Atom "param"; sexp_of_option (sexp_of_t f) param ]
+      ]
 ;;
 
-let empty = { data = None; literal = Smap.empty; param = None }
+let empty_with data = Node { data; literal = Smap.empty; param = None }
+let empty = empty_with None
 
 let match_url t url =
   let tokens = String.split_on_char ~sep:'/' url in
   match tokens with
   | "" :: tokens ->
+    let accept a route captured =
+      let params = Params.create route captured in
+      Some (a, params)
+    in
     let rec loop t captured tokens =
-      match tokens with
-      | [ "" ] | [] ->
-        (match t.data with
-        | None -> None
-        | Some (a, route) ->
-          let params = Params.create route captured in
-          Some (a, params))
-      | s :: tokens ->
-        let param =
-          match t.param with
+      match t with
+      | Accept (a, route) -> accept a route captured
+      | Node t ->
+        (match tokens with
+        | [ "" ] | [] ->
+          (match t.data with
           | None -> None
-          | Some node -> loop node (s :: captured) tokens
-        in
-        (match param with
-        | Some _ -> param
-        | None ->
-          (match Smap.find_opt s t.literal with
-          | None -> None
-          | Some node -> loop node captured tokens))
+          | Some (a, route) -> accept a route captured)
+        | s :: tokens ->
+          let param =
+            match t.param with
+            | None -> None
+            | Some node -> loop node (s :: captured) tokens
+          in
+          (match param with
+          | Some _ -> param
+          | None ->
+            (match Smap.find_opt s t.literal with
+            | None -> None
+            | Some node -> loop node captured tokens)))
     in
     loop t [] tokens
   | _ -> None
@@ -162,28 +174,31 @@ let match_url t url =
 
 let match_route t route =
   let rec loop t (route : Route.t) =
-    match route with
-    | Full_splat -> assert false
-    | Nil ->
-      (match t.data with
-      | None -> []
-      | Some (_, r) -> [ r ])
-    | Literal (lit, route) ->
-      let by_param = by_param t route in
-      let by_literal =
-        match Smap.find_opt lit t.literal with
+    match t with
+    | Accept (_, r) -> [ r ]
+    | Node t ->
+      (match route with
+      | Full_splat -> assert false
+      | Nil ->
+        (match t.data with
         | None -> []
-        | Some node -> loop node route
-      in
-      by_param @ by_literal
-    | Param (_, route) ->
-      let by_param = by_param t route in
-      let by_literal =
-        Smap.fold (fun _ node acc -> loop node route :: acc) t.literal []
-      in
-      List.concat (by_param :: by_literal)
-  and by_param t route =
-    match t.param with
+        | Some (_, r) -> [ r ])
+      | Literal (lit, route) ->
+        let by_param = by_param t.param route in
+        let by_literal =
+          match Smap.find_opt lit t.literal with
+          | None -> []
+          | Some node -> loop node route
+        in
+        by_param @ by_literal
+      | Param (_, route) ->
+        let by_param = by_param t.param route in
+        let by_literal =
+          Smap.fold (fun _ node acc -> loop node route :: acc) t.literal []
+        in
+        List.concat (by_param :: by_literal))
+  and by_param param route =
+    match param with
     | None -> []
     | Some node -> loop node route
   in
@@ -194,23 +209,26 @@ let match_route t route =
 
 let add_no_check t orig_route a =
   let rec loop t (route : Route.t) =
-    match route with
-    | Full_splat -> assert false
-    | Nil -> { empty with data = Some (a, orig_route) }
-    | Literal (lit, route) ->
-      let literal =
-        match Smap.find_opt lit t.literal with
-        | None -> Smap.add lit (loop empty route) t.literal
-        | Some node -> Smap.add lit (loop node route) t.literal
-      in
-      { t with literal }
-    | Param (_, route) ->
-      let param =
-        match t.param with
-        | None -> loop empty route
-        | Some node -> loop node route
-      in
-      { t with param = Some param }
+    match t with
+    | Accept (_, _) -> assert false
+    | Node t ->
+      (match route with
+      | Full_splat -> Accept (a, orig_route)
+      | Nil -> empty_with (Some (a, orig_route))
+      | Literal (lit, route) ->
+        let literal =
+          match Smap.find_opt lit t.literal with
+          | None -> Smap.add lit (loop empty route) t.literal
+          | Some node -> Smap.add lit (loop node route) t.literal
+        in
+        Node { t with literal }
+      | Param (_, route) ->
+        let param =
+          match t.param with
+          | None -> loop empty route
+          | Some node -> loop node route
+        in
+        Node { t with param = Some param })
   in
   loop t orig_route
 ;;

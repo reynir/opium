@@ -10,42 +10,50 @@ let valid_route s =
 
 let%expect_test "nil route" =
   valid_route "/";
-  [%expect {| [PASS] valid route:Nil |}]
+  [%expect {|
+    [PASS] valid route:Nil |}]
 ;;
 
 let%expect_test "literal route" =
   valid_route "/foo/bar";
-  [%expect {| [PASS] valid route:(foo (bar Nil)) |}]
+  [%expect {|
+    [PASS] valid route:(foo (bar Nil)) |}]
 ;;
 
 let%expect_test "named parameters valid" =
   valid_route "/foo/:param/:another";
-  [%expect {| [PASS] valid route:(foo (:param (:another Nil))) |}]
+  [%expect {|
+    [PASS] valid route:(foo (:param (:another Nil))) |}]
 ;;
 
 let%expect_test "unnamed parameter valid" =
   valid_route "/foo/*";
-  [%expect {| [PASS] valid route:(foo (* Nil)) |}]
+  [%expect {|
+    [PASS] valid route:(foo (* Nil)) |}]
 ;;
 
 let%expect_test "param followed by literal" =
   valid_route "/foo/*/bar/:param/bar";
-  [%expect {| [PASS] valid route:(foo (* (bar (:param (bar Nil))))) |}]
+  [%expect {|
+    [PASS] valid route:(foo (* (bar (:param (bar Nil))))) |}]
 ;;
 
 let%expect_test "duplicate paramters" =
   valid_route "/foo/:bar/:bar/x";
-  [%expect {| [FAIL] invalid route duplicate parameter "bar" |}]
+  [%expect {|
+    [FAIL] invalid route duplicate parameter "bar" |}]
 ;;
 
 let%expect_test "splat in the middle is wrong" =
   valid_route "/foo/**/foo";
-  [%expect {| [FAIL] invalid route double splat allowed only in the end |}]
+  [%expect {|
+    [FAIL] invalid route double splat allowed only in the end |}]
 ;;
 
 let%expect_test "splat at the end" =
   valid_route "/foo/**";
-  [%expect {| [PASS] valid route:(foo Full_splat) |}]
+  [%expect {|
+    [PASS] valid route:(foo Full_splat) |}]
 ;;
 
 let test_match_url router url =
@@ -104,7 +112,7 @@ let%expect_test "ambiguity in routes" =
   (Failure "duplicate routes")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 96, characters 2-49
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 104, characters 2-49
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 
@@ -120,7 +128,7 @@ let%expect_test "ambiguity in routes 2" =
   (Failure "duplicate routes")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 112, characters 2-43
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 120, characters 2-43
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 
@@ -143,13 +151,13 @@ let%expect_test "nodes are matched correctly" =
 ;;
 
 let%expect_test "full splat node matches" =
-  let router = of_routes [ "/foo/** ", () ] in
+  let router = of_routes [ "/foo/**", () ] in
   let test = test_match_url router in
   test "/foo/bar";
   test "/foo/bar/foo";
   test "/foo/";
-  [%expect {|
-    no match
-    no match
-    no match |}]
+  [%expect{|
+    matched with params: ((named ()) (unnamed ()))
+    matched with params: ((named ()) (unnamed ()))
+    matched with params: ((named ()) (unnamed ())) |}]
 ;;
