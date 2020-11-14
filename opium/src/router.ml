@@ -1,3 +1,5 @@
+open Import
+
 module Route = struct
   open Printf
 
@@ -7,13 +9,13 @@ module Route = struct
     | Literal of string * t
     | Param of string option * t
 
-  let rec sexp_of_t (t : t) : Sexplib0.Sexp.t =
+  let rec sexp_of_t (t : t) : Sexp.t =
     match t with
     | Nil -> Atom "Nil"
     | Full_splat -> Atom "Full_splat"
     | Literal (x, y) -> List [ Atom x; sexp_of_t y ]
     | Param (x, y) ->
-      let x : Sexplib0.Sexp.t =
+      let x : Sexp.t =
         match x with
         | Some x -> Atom (":" ^ x)
         | None -> Atom "*"
@@ -39,11 +41,11 @@ module Route = struct
         let name =
           let len = String.length token in
           if len > 1
-          then String.sub token 1 (len - 1)
+          then String.sub token ~pos:1 ~len:(len - 1)
           else raise (E "Named paramter is missing a name")
         in
         let params =
-          if List.mem name params
+          if List.mem name ~set:params
           then raise (E (sprintf "duplicate parameter %S" name))
           else name :: params
         in
@@ -52,7 +54,7 @@ module Route = struct
   ;;
 
   let of_string_exn s =
-    let tokens = String.split_on_char '/' s in
+    let tokens = String.split_on_char ~sep:'/' s in
     match tokens with
     | "" :: tokens -> parse_tokens [] tokens
     | _ -> raise (E "route must start with /")
@@ -72,8 +74,8 @@ module Params = struct
     }
 
   let sexp_of_t { named; unnamed } =
-    let open Sexplib0.Sexp_conv in
-    Sexplib0.Sexp.List
+    let open Sexp_conv in
+    Sexp.List
       [ List
           [ Atom "named"
           ; sexp_of_list (sexp_of_pair sexp_of_string sexp_of_string) named
@@ -114,15 +116,13 @@ type 'a t =
   ; param : 'a t option
   }
 
-let sexp_of_smap f smap : Sexplib0.Sexp.t =
-  List
-    (Smap.bindings smap
-    |> ListLabels.map ~f:(fun (k, v) -> Sexplib0.Sexp.List [ Atom k; f v ]))
+let sexp_of_smap f smap : Sexp.t =
+  List (Smap.bindings smap |> List.map ~f:(fun (k, v) -> Sexp.List [ Atom k; f v ]))
 ;;
 
 let rec sexp_of_t f { data; literal; param } =
-  let open Sexplib0.Sexp_conv in
-  Sexplib0.Sexp.List
+  let open Sexp_conv in
+  Sexp.List
     [ List [ Atom "data"; sexp_of_option (sexp_of_pair f Route.sexp_of_t) data ]
     ; List [ Atom "literal"; sexp_of_smap (sexp_of_t f) literal ]
     ; List [ Atom "param"; sexp_of_option (sexp_of_t f) param ]
@@ -132,7 +132,7 @@ let rec sexp_of_t f { data; literal; param } =
 let empty = { data = None; literal = Smap.empty; param = None }
 
 let match_url t url =
-  let tokens = String.split_on_char '/' url in
+  let tokens = String.split_on_char ~sep:'/' url in
   match tokens with
   | "" :: tokens ->
     let rec loop t captured tokens =
