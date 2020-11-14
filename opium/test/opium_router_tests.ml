@@ -37,6 +37,16 @@ let%expect_test "duplicate paramters" =
   [%expect {| [FAIL] invalid route duplicate parameter "bar" |}]
 ;;
 
+let%expect_test "splat in the middle is wrong" =
+  valid_route "/foo/**/foo";
+  [%expect {| [FAIL] invalid route double splat allowed only in the end |}]
+;;
+
+let%expect_test "splat at the end" =
+  valid_route "/foo/**";
+  [%expect {| [PASS] valid route |}]
+;;
+
 let test_match_url router url =
   match Router.match_url router url with
   | None -> print_endline "no match"
@@ -93,7 +103,7 @@ let%expect_test "ambiguity in routes" =
   (Failure "duplicate routes")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 85, characters 2-49
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 95, characters 2-49
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 
@@ -109,7 +119,7 @@ let%expect_test "ambiguity in routes 2" =
   (Failure "duplicate routes")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 101, characters 2-43
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 111, characters 2-43
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 

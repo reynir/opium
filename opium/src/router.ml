@@ -3,12 +3,14 @@ module Route = struct
 
   type t =
     | Nil
+    | Full_splat
     | Literal of string * t
     | Param of string option * t
 
   let rec sexp_of_t (t : t) : Sexplib0.Sexp.t =
     match t with
     | Nil -> Atom "Nil"
+    | Full_splat -> Atom "Full_splat"
     | Literal (x, y) -> List [ Atom x; sexp_of_t y ]
     | Param (x, y) ->
       let x : Sexplib0.Sexp.t =
@@ -23,6 +25,7 @@ module Route = struct
 
   let rec parse_tokens params tokens =
     match tokens with
+    | [ "**" ] -> Full_splat
     | [] | [ "" ] -> Nil
     | token :: tokens ->
       if token = ""
@@ -86,6 +89,7 @@ module Params = struct
   let create route captured =
     let rec loop acc (route : Route.t) captured =
       match route, captured with
+      | Full_splat, _ -> assert false
       | Nil, [] -> acc
       | Literal (_, route), _ -> loop acc route captured
       | Param (None, route), p :: captured ->
@@ -159,6 +163,7 @@ let match_url t url =
 let match_route t route =
   let rec loop t (route : Route.t) =
     match route with
+    | Full_splat -> assert false
     | Nil ->
       (match t.data with
       | None -> []
@@ -190,6 +195,7 @@ let match_route t route =
 let add_no_check t orig_route a =
   let rec loop t (route : Route.t) =
     match route with
+    | Full_splat -> assert false
     | Nil -> { empty with data = Some (a, orig_route) }
     | Literal (lit, route) ->
       let literal =
