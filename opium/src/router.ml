@@ -9,6 +9,8 @@ module Route = struct
     | Literal of string * t
     | Param of string option * t
 
+  let equal = ( = )
+
   let rec sexp_of_t (t : t) : Sexp.t =
     match t with
     | Nil -> Atom "Nil"
@@ -166,7 +168,7 @@ let match_url t url =
           | None ->
             (match Smap.find_opt s t.literal with
             | None -> None
-            | Some node -> loop node captured tokens)))
+            | Some node -> (loop [@tailcall]) node captured tokens)))
     in
     loop t [] tokens
   | _ -> None
@@ -175,14 +177,14 @@ let match_url t url =
 let match_route t route =
   let rec loop t (route : Route.t) =
     match t with
-    | Accept (_, r) -> [ r ]
+    | Accept (a, r) -> [ a, r ]
     | Node t ->
       (match route with
       | Full_splat -> assert false
       | Nil ->
         (match t.data with
         | None -> []
-        | Some (_, r) -> [ r ])
+        | Some (a, r) -> [ a, r ])
       | Literal (lit, route) ->
         let by_param = by_param t.param route in
         let by_literal =
@@ -231,6 +233,16 @@ let add_no_check t orig_route a =
         Node { t with param = Some param })
   in
   loop t orig_route
+;;
+
+let update t r ~f =
+  match match_route t r with
+  | Error [ (a, r') ] ->
+    if Route.equal r r'
+    then add_no_check t r (f (Some a))
+    else failwith "duplicate routes"
+  | Ok () -> add_no_check t r (f None)
+  | Error ([] | _ :: _ :: _) -> failwith "duplicate routes"
 ;;
 
 let add t route a =
