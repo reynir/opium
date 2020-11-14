@@ -123,17 +123,19 @@ let%expect_test "ambiguity in routes 2" =
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 
+let test_match router url expected_value =
+  match match_url router url with
+  | Some (s, _) -> assert (s = expected_value)
+  | None ->
+    Format.printf
+      "%a@."
+      Sexplib0.Sexp.pp_hum
+      (Router.sexp_of_t Sexplib0.Sexp_conv.sexp_of_string router)
+;;
+
 let%expect_test "nodes are matched correctly" =
   let router = of_routes [ "/foo/bar", "Wrong"; "/foo/baz", "Right" ] in
-  let test url expected_value =
-    match match_url router url with
-    | Some (s, _) -> assert (s = expected_value)
-    | None ->
-      Format.printf
-        "%a@."
-        Sexplib0.Sexp.pp_hum
-        (Router.sexp_of_t Sexplib0.Sexp_conv.sexp_of_string router)
-  in
+  let test = test_match router in
   test "/foo/bar" "Wrong";
   test "/foo/baz" "Right";
   [%expect {| |}]
