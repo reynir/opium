@@ -140,3 +140,15 @@ let%expect_test "nodes are matched correctly" =
   test "/foo/baz" "Right";
   [%expect {| |}]
 ;;
+
+let%expect_test "full splat node matches" =
+  let router = of_routes [ "/foo/** ", () ] in
+  let test = test_match_url router in
+  test "/foo/bar";
+  test "/foo/bar/foo";
+  test "/foo/";
+  [%expect {|
+    no match
+    no match
+    no match |}]
+;;
