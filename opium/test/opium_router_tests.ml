@@ -1,11 +1,11 @@
+open Sexplib0
 module Router = Opium.Private.Router
 open Router
 
 let valid_route s =
   match Route.of_string s with
   | Error err -> print_endline ("[FAIL] invalid route " ^ err)
-  | Ok r ->
-    Format.printf "[PASS] valid route:%a@." Sexplib0.Sexp.pp_hum (Route.sexp_of_t r)
+  | Ok r -> Format.printf "[PASS] valid route:%a@." Sexp.pp_hum (Route.sexp_of_t r)
 ;;
 
 let%expect_test "nil route" =
@@ -60,7 +60,7 @@ let test_match_url router url =
   match Router.match_url router url with
   | None -> print_endline "no match"
   | Some (_, p) ->
-    Format.printf "matched with params: %a@." Sexplib0.Sexp.pp_hum (Params.sexp_of_t p)
+    Format.printf "matched with params: %a@." Sexp.pp_hum (Params.sexp_of_t p)
 ;;
 
 let%expect_test "dummy router matches nothing" =
@@ -136,10 +136,7 @@ let test_match router url expected_value =
   match match_url router url with
   | Some (s, _) -> assert (s = expected_value)
   | None ->
-    Format.printf
-      "%a@."
-      Sexplib0.Sexp.pp_hum
-      (Router.sexp_of_t Sexplib0.Sexp_conv.sexp_of_string router)
+    Format.printf "%a@." Sexp.pp_hum (Router.sexp_of_t Sexp_conv.sexp_of_string router)
 ;;
 
 let%expect_test "nodes are matched correctly" =
@@ -151,13 +148,30 @@ let%expect_test "nodes are matched correctly" =
 ;;
 
 let%expect_test "full splat node matches" =
-  let router = of_routes [ "/foo/**", () ] in
+  let router = of_routes' [ "/foo/**" ] in
   let test = test_match_url router in
   test "/foo/bar";
   test "/foo/bar/foo";
   test "/foo/";
-  [%expect{|
+  [%expect
+    {|
     matched with params: ((named ()) (unnamed ()))
     matched with params: ((named ()) (unnamed ()))
     matched with params: ((named ()) (unnamed ())) |}]
+;;
+
+let%expect_test "full splat + collision checking" =
+  ignore (of_routes' [ "/foo/**"; "/*/bar" ]);
+  [%expect.unreachable]
+  [@@expect.uncaught_exn
+    {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+
+  (Failure "duplicate routes")
+  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+  Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 164, characters 9-45
+  Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
