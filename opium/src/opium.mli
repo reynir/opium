@@ -1,3 +1,9 @@
+module Private : sig
+  module Router : module type of struct
+    include Router
+  end
+end
+
 module Context = Context
 module Headers = Headers
 module Cookie = Cookie
