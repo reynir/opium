@@ -40,7 +40,8 @@ let%expect_test "duplicate paramters" =
 let test_match_url router url =
   match Router.match_url router url with
   | None -> print_endline "no match"
-  | Some (_, p) -> Format.printf "matched with params: %a@." Params.pp p
+  | Some (_, p) ->
+    Format.printf "matched with params: %a@." Sexplib0.Sexp.pp_hum (Params.sexp_of_t p)
 ;;
 
 let%expect_test "dummy router matches nothing" =
@@ -55,7 +56,7 @@ let%expect_test "we can add & match literal routes" =
   let router = add empty route () in
   test_match_url router url;
   [%expect {|
-    matched with params: { named = []  ; unnamed = [] } |}]
+    matched with params: ((named ()) (unnamed ())) |}]
 ;;
 
 let%expect_test "we can extract parameter after match" =
@@ -66,7 +67,7 @@ let%expect_test "we can extract parameter after match" =
   test_match_url router "/foo/100/200/300";
   [%expect
     {|
-    matched with params: { named = [(bar, 100)]  ; unnamed = [baz] }
+    matched with params: ((named ((bar 100))) (unnamed (baz)))
     no match
     no match |}]
 ;;
@@ -92,7 +93,7 @@ let%expect_test "ambiguity in routes" =
   (Failure "duplicate routes")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 84, characters 2-49
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 85, characters 2-49
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 
@@ -108,7 +109,7 @@ let%expect_test "ambiguity in routes 2" =
   (Failure "duplicate routes")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Stdlib__list.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 100, characters 2-43
+  Called from Opium_tests__Opium_router_tests.(fun) in file "opium/test/opium_router_tests.ml", line 101, characters 2-43
   Called from Expect_test_collector.Make.Instance.exec in file "collector/expect_test_collector.ml", line 244, characters 12-19 |}]
 ;;
 
@@ -117,7 +118,11 @@ let%expect_test "nodes are matched correctly" =
   let test url expected_value =
     match match_url router url with
     | Some (s, _) -> assert (s = expected_value)
-    | None -> Format.printf "%a@." (Router.pp Format.pp_print_string) router
+    | None ->
+      Format.printf
+        "%a@."
+        Sexplib0.Sexp.pp_hum
+        (Router.sexp_of_t Sexplib0.Sexp_conv.sexp_of_string router)
   in
   test "/foo/bar" "Wrong";
   test "/foo/baz" "Right";

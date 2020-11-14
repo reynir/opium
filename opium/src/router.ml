@@ -6,6 +6,19 @@ module Route = struct
     | Literal of string * t
     | Param of string option * t
 
+  let rec sexp_of_t (t : t) : Sexplib0.Sexp.t =
+    match t with
+    | Nil -> Atom "Nil"
+    | Literal (x, y) -> List [ Atom x; sexp_of_t y ]
+    | Param (x, y) ->
+      let x : Sexplib0.Sexp.t =
+        match x with
+        | Some x -> Atom (":" ^ x)
+        | None -> Atom "*"
+      in
+      List [ x; sexp_of_t y ]
+  ;;
+
   exception E of string
 
   let rec parse_tokens params tokens =
@@ -55,30 +68,15 @@ module Params = struct
     ; unnamed : string list
     }
 
-  let pp fmt { named; unnamed } =
-    let pp_sep fmt () = Format.fprintf fmt ";@ " in
-    let pp_named fmt named =
-      Format.fprintf
-        fmt
-        "@[[%a]@]"
-        (Format.pp_print_list ~pp_sep (fun fmt (name, value) ->
-             Format.fprintf fmt "(%s,@ %s)" name value))
-        named
-    in
-    let pp_unnamed fmt unnamed =
-      Format.fprintf
-        fmt
-        "@[[%a]@]"
-        (Format.pp_print_list ~pp_sep (fun fmt unnamed -> Format.fprintf fmt "%s" unnamed))
-        unnamed
-    in
-    Format.fprintf
-      fmt
-      "@[{ named@ = %a @ ;@ unnamed = %a@ }@]"
-      pp_named
-      named
-      pp_unnamed
-      unnamed
+  let sexp_of_t { named; unnamed } =
+    let open Sexplib0.Sexp_conv in
+    Sexplib0.Sexp.List
+      [ List
+          [ Atom "named"
+          ; sexp_of_list (sexp_of_pair sexp_of_string sexp_of_string) named
+          ]
+      ; List [ Atom "unnamed"; sexp_of_list sexp_of_string unnamed ]
+      ]
   ;;
 
   let named t name = List.assoc name t.named
@@ -112,13 +110,19 @@ type 'a t =
   ; param : 'a t option
   }
 
-let rec pp f fmt { data; literal; param } =
-  ignore (data, param);
-  Format.pp_open_box fmt 0;
-  Format.fprintf fmt "{@ ";
-  Smap.iter (fun lit node -> Format.fprintf fmt "@[(%S,@ %a)@ @]" lit (pp f) node) literal;
-  Format.fprintf fmt "@ }";
-  Format.pp_close_box fmt ()
+let sexp_of_smap f smap : Sexplib0.Sexp.t =
+  List
+    (Smap.bindings smap
+    |> ListLabels.map ~f:(fun (k, v) -> Sexplib0.Sexp.List [ Atom k; f v ]))
+;;
+
+let rec sexp_of_t f { data; literal; param } =
+  let open Sexplib0.Sexp_conv in
+  Sexplib0.Sexp.List
+    [ List [ Atom "data"; sexp_of_option (sexp_of_pair f Route.sexp_of_t) data ]
+    ; List [ Atom "literal"; sexp_of_smap (sexp_of_t f) literal ]
+    ; List [ Atom "param"; sexp_of_option (sexp_of_t f) param ]
+    ]
 ;;
 
 let empty = { data = None; literal = Smap.empty; param = None }
