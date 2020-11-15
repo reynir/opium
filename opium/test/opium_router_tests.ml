@@ -3,7 +3,7 @@ module Router = Opium.Private.Router
 open Router
 
 let valid_route s =
-  match Route.of_string s with
+  match Route.of_string_result s with
   | Error err -> print_endline ("[FAIL] invalid route " ^ err)
   | Ok r -> Format.printf "[PASS] valid route:%a@." Sexp.pp_hum (Route.sexp_of_t r)
 ;;
@@ -71,7 +71,7 @@ let%expect_test "dummy router matches nothing" =
 
 let%expect_test "we can add & match literal routes" =
   let url = "/foo/bar" in
-  let route = Route.of_string_exn url in
+  let route = Route.of_string url in
   let router = add empty route () in
   test_match_url router url;
   [%expect {|
@@ -79,7 +79,7 @@ let%expect_test "we can add & match literal routes" =
 ;;
 
 let%expect_test "we can extract parameter after match" =
-  let route = Route.of_string_exn "/foo/*/:bar" in
+  let route = Route.of_string "/foo/*/:bar" in
   let router = add empty route () in
   test_match_url router "/foo/100/baz";
   test_match_url router "/foo/100";
@@ -93,7 +93,7 @@ let%expect_test "we can extract parameter after match" =
 
 let of_routes routes =
   List.fold_left
-    (fun router (route, data) -> add router (Route.of_string_exn route) data)
+    (fun router (route, data) -> add router (Route.of_string route) data)
     empty
     routes
 ;;

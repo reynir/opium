@@ -14,7 +14,7 @@ module Body = Body
 module Request = Request
 module Response = Response
 module App = App
-module Route = Route
+module Route = Router.Route
 
 module Router : sig
   type t

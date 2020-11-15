@@ -3,9 +3,10 @@ open Import
 module Route : sig
   type t
 
-  val of_string : string -> (t, string) result
-  val of_string_exn : string -> t
+  val of_string_result : string -> (t, string) result
+  val of_string : string -> t
   val sexp_of_t : t -> Sexp.t
+  val to_string : t -> string
 end
 
 module Params : sig

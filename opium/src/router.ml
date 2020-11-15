@@ -11,6 +11,18 @@ module Route = struct
 
   let equal = ( = )
 
+  let to_string t =
+    let rec loop acc = function
+      | Nil -> acc
+      | Full_splat -> "**" :: acc
+      | Literal (s, rest) -> loop (s :: acc) rest
+      | Param (s, rest) ->
+        let s = Option.value s ~default:"*" in
+        loop (s :: acc) rest
+    in
+    loop [] t |> List.rev |> String.concat ~sep:"/"
+  ;;
+
   let rec sexp_of_t (t : t) : Sexp.t =
     match t with
     | Nil -> Atom "Nil"
@@ -55,15 +67,15 @@ module Route = struct
       else Literal (token, parse_tokens params tokens)
   ;;
 
-  let of_string_exn s =
+  let of_string s =
     let tokens = String.split_on_char ~sep:'/' s in
     match tokens with
     | "" :: tokens -> parse_tokens [] tokens
     | _ -> raise (E "route must start with /")
   ;;
 
-  let of_string s =
-    match of_string_exn s with
+  let of_string_result s =
+    match of_string s with
     | exception E s -> Error s
     | s -> Ok s
   ;;
