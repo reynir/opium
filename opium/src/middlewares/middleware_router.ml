@@ -10,7 +10,7 @@ module Method_map = Map.Make (struct
   ;;
 end)
 
-type 'a t = (Route.t * 'a) list Method_map.t
+type t = (Route.t * Rock.Handler.t) list Method_map.t
 
 let empty = Method_map.empty
 
