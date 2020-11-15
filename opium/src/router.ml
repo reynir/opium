@@ -219,16 +219,14 @@ let add_no_check t orig_route a =
       | Nil -> empty_with (Some (a, orig_route))
       | Literal (lit, route) ->
         let literal =
-          match Smap.find_opt lit t.literal with
-          | None -> Smap.add lit (loop empty route) t.literal
-          | Some node -> Smap.add lit (loop node route) t.literal
+          let node = Smap.find_opt lit t.literal |> Option.value ~default:empty in
+          Smap.add lit (loop node route) t.literal
         in
         Node { t with literal }
       | Param (_, route) ->
         let param =
-          match t.param with
-          | None -> loop empty route
-          | Some node -> loop node route
+          let node = Option.value t.param ~default:empty in
+          loop node route
         in
         Node { t with param = Some param })
   in
